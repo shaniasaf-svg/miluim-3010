@@ -1,0 +1,559 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="מעלים טופס 3010 ומקבלים את ימי המילואים שחלו בערב שבת, בשבת, בערב חג ובחג. הקובץ מעובד בדפדפן בלבד.">
+<title>מחשבון ימי מילואים 3010</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Secular+One&family=Assistant:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a working form sheet — intake (upload + periods) beside the tally, then the full dated ledger below. */
+:root{
+  --paper:#F2F3EC; --card:#FBFBF7; --ink:#1E2318; --muted:#636A58; --line:#D5D8C8;
+  --olive:#4A5A26; --olive-soft:#E3E8D2;
+  --c-fri:#A86A12; --c-fri-bg:#F6EAD3;
+  --c-sat:#34539E; --c-sat-bg:#E1E7F5;
+  --c-erev:#257062; --c-erev-bg:#D9EEE8;
+  --c-chag:#A23A3D; --c-chag-bg:#F5DEDE;
+  --warn:#8A5A00;
+  --f-display:"Secular One","Assistant",system-ui,sans-serif;
+  --f-body:"Assistant",system-ui,"Segoe UI",Arial,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#14170F; --card:#1C2015; --ink:#E6E9DD; --muted:#A0A694; --line:#343B29;
+  --olive:#AFC274; --olive-soft:#2A3219;
+  --c-fri:#E3AE5A; --c-fri-bg:#3A2D14;
+  --c-sat:#93AEEB; --c-sat-bg:#1F2A45;
+  --c-erev:#72C8B4; --c-erev-bg:#163A33;
+  --c-chag:#EE9497; --c-chag-bg:#45201F;
+  --warn:#E5B55A; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#14170F; --card:#1C2015; --ink:#E6E9DD; --muted:#A0A694; --line:#343B29;
+  --olive:#AFC274; --olive-soft:#2A3219;
+  --c-fri:#E3AE5A; --c-fri-bg:#3A2D14;
+  --c-sat:#93AEEB; --c-sat-bg:#1F2A45;
+  --c-erev:#72C8B4; --c-erev-bg:#163A33;
+  --c-chag:#EE9497; --c-chag-bg:#45201F;
+  --warn:#E5B55A; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.55;margin:0}
+.wrap{max-width:1120px;margin:0 auto;padding-inline:16px;padding-block:28px 64px;display:flex;flex-direction:column;gap:28px}
+h1,h2{font-family:var(--f-display);font-weight:400;margin:0;text-wrap:balance;line-height:1.2}
+h1{font-size:clamp(1.7rem,4vw,2.4rem)}
+h2{font-size:1.3rem}
+.mono,.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--olive);outline-offset:2px}
+
+header{display:flex;gap:16px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+header p{margin:6px 0 0;color:var(--muted);max-width:62ch}
+.stamp{font-family:var(--f-mono);font-size:.8rem;letter-spacing:.08em;color:var(--olive);border:2px solid var(--olive);padding:6px 10px;border-radius:4px;transform:rotate(-3deg);white-space:nowrap;align-self:center}
+
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:20px}
+@media (max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:20px;display:flex;flex-direction:column;gap:16px;min-width:0}
+.label{font-size:.78rem;letter-spacing:.06em;color:var(--muted);font-weight:700}
+
+.drop{border:2px dashed var(--line);border-radius:10px;padding:22px 16px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;display:flex;flex-direction:column;gap:6px;align-items:center}
+.drop:hover,.drop.over{border-color:var(--olive);background:var(--olive-soft)}
+.drop strong{font-size:1.05rem}
+.drop small{color:var(--muted)}
+.btn{background:var(--olive);color:var(--card);border:0;border-radius:6px;padding:8px 14px;font-weight:700;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--olive);border:1px solid var(--olive)}
+.btn:disabled{opacity:.5;cursor:default}
+
+.status{font-size:.92rem;padding:10px 12px;border-radius:8px;background:var(--olive-soft)}
+.status.warn{color:var(--warn)}
+.status.example{border:1px dashed var(--olive);background:transparent}
+
+.periods{display:flex;flex-direction:column;gap:8px;margin:0;padding:0;list-style:none}
+.period{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:8px}
+.period.off{opacity:.55}
+.period .range{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:.95rem}
+.period .meta{font-size:.82rem;color:var(--muted)}
+.period .meta .ok{color:var(--c-erev);font-weight:700}
+.period .meta .note{color:var(--warn);font-weight:600}
+.x{background:none;border:0;color:var(--muted);cursor:pointer;font-size:1.2rem;line-height:1;padding:4px 6px;border-radius:4px}
+.x:hover{color:var(--c-chag)}
+.add{display:flex;gap:8px;flex-wrap:wrap;align-items:end}
+.add label{display:flex;flex-direction:column;font-size:.8rem;color:var(--muted);gap:2px}
+.add input{border:1px solid var(--line);background:var(--paper);border-radius:6px;padding:6px 8px}
+
+.tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.tile{border:1px solid var(--line);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:2px}
+.tile .n{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:1.8rem;line-height:1.1;font-weight:500}
+.tile .t{font-size:.9rem;font-weight:600}
+.tile.fri .n{color:var(--c-fri)} .tile.sat .n{color:var(--c-sat)} .tile.erev .n{color:var(--c-erev)} .tile.chag .n{color:var(--c-chag)}
+.hero{grid-column:1/-1;background:var(--olive);border-color:var(--olive);color:var(--card);display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 16px;align-items:center}
+.hero .n{font-size:3rem;grid-row:span 2}
+.hero .t{font-size:1.05rem}
+.hero .s{font-size:.88rem;opacity:.9}
+.total{display:flex;gap:18px;flex-wrap:wrap;font-size:.92rem;color:var(--muted)}
+.total b{color:var(--ink);font-family:var(--f-mono);font-weight:500}
+
+.tablehead{display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:wrap}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:transparent;border-radius:999px;padding:4px 12px;font-size:.88rem;cursor:pointer;font-weight:600}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.tablebox{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--card)}
+table{border-collapse:collapse;width:100%;min-width:640px}
+th,td{text-align:right;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{font-size:.78rem;letter-spacing:.05em;color:var(--muted);font-weight:700;background:var(--paper);position:sticky;top:0}
+tbody tr:last-child td{border-bottom:0}
+td.d{font-family:var(--f-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+td.heb{color:var(--muted);font-size:.9rem}
+.tag{display:inline-block;border-radius:4px;padding:1px 8px;font-size:.82rem;font-weight:700;margin-inline-end:4px;white-space:nowrap}
+.tag.fri{color:var(--c-fri);background:var(--c-fri-bg)}
+.tag.sat{color:var(--c-sat);background:var(--c-sat-bg)}
+.tag.erev{color:var(--c-erev);background:var(--c-erev-bg)}
+.tag.chag{color:var(--c-chag);background:var(--c-chag-bg)}
+tr.overlap td:first-child{box-shadow:inset -3px 0 0 var(--olive)}
+.empty{padding:28px;text-align:center;color:var(--muted)}
+details{font-size:.88rem;color:var(--muted)}
+details pre{white-space:pre-wrap;max-height:260px;overflow:auto;background:var(--paper);padding:10px;border-radius:6px;font-family:var(--f-mono);font-size:.8rem;direction:ltr;text-align:left}
+.foot{font-size:.85rem;color:var(--muted);max-width:75ch}
+.foot p{margin:4px 0}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap" dir="rtl" lang="he">
+  <header>
+    <div>
+      <h1>מחשבון ימי מילואים בשבתות ובחגים</h1>
+      <p>מעלים את טופס 3010 (אישור על שירות מילואים) כ־PDF. המחשבון מזהה את תקופות השירות ומסמן כל יום שהוא ערב שבת, שבת, ערב חג או חג לפי לוח החגים בישראל.</p>
+    </div>
+    <span class="stamp">טופס 3010</span>
+  </header>
+
+  <div class="grid">
+    <section class="panel" aria-labelledby="in-h">
+      <h2 id="in-h">תקופות שירות</h2>
+      <label class="drop" id="drop" for="file">
+        <strong>גררו לכאן את קובץ ה־PDF או לחצו לבחירה</strong>
+        <small>אפשר כמה קבצים. הקובץ נקרא בדפדפן בלבד ולא נשלח לשום מקום.</small>
+      </label>
+      <input type="file" id="file" accept="application/pdf,.pdf" multiple hidden>
+      <div id="status" class="status example">מוצגות תקופות לדוגמה. העלו טופס 3010 כדי לחשב את הנתונים שלכם.</div>
+      <ul class="periods" id="periods"></ul>
+      <form class="add" id="addForm">
+        <label for="addFrom">מתאריך<input type="date" id="addFrom" required></label>
+        <label for="addTo">עד תאריך<input type="date" id="addTo" required></label>
+        <button class="btn ghost" type="submit">הוספת תקופה ידנית</button>
+      </form>
+      <details id="rawBox" hidden>
+        <summary>הטקסט שחולץ מהקובץ (לבדיקה)</summary>
+        <pre id="raw"></pre>
+      </details>
+    </section>
+
+    <section class="panel" aria-labelledby="sum-h">
+      <h2 id="sum-h">סיכום</h2>
+      <div class="tiles" id="tiles"></div>
+      <div class="total" id="totals"></div>
+    </section>
+  </div>
+
+  <section style="display:flex;flex-direction:column;gap:12px" aria-labelledby="tbl-h">
+    <div class="tablehead">
+      <h2 id="tbl-h">פירוט לפי תאריך</h2>
+      <div class="chips" id="chips"></div>
+      <button class="btn ghost" id="copyBtn" type="button">העתקת הטבלה לאקסל</button>
+    </div>
+    <div class="tablebox">
+      <table>
+        <thead><tr><th>תאריך</th><th>יום</th><th>תאריך עברי</th><th>קטגוריה</th><th>פירוט</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="foot">
+    <p><b>חגים שנספרים (לוח ישראל):</b> ראש השנה (שני הימים), יום כיפור, סוכות, שמיני עצרת / שמחת תורה, פסח, שביעי של פסח, שבועות.</p>
+    <p><b>ערבי חג:</b> ערב ראש השנה, ערב יום כיפור, ערב סוכות, הושענא רבה, ערב פסח, ערב שביעי של פסח, ערב שבועות. חול המועד, פורים, חנוכה ויום העצמאות אינם נספרים.</p>
+    <p>יום יכול להשתייך ליותר מקטגוריה אחת (למשל ערב חג שחל ביום שישי). לכן המספר המרכזי בסיכום סופר כל תאריך פעם אחת בלבד. תקופות חופפות מאוחדות ואינן נספרות פעמיים.</p>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+<script>
+// ---------- Calendar (CAL-START) ----------
+const DAY = 86400000;
+const dn = (y, m, d) => Math.floor(Date.UTC(y, m - 1, d) / DAY);
+const dnDate = n => new Date(n * DAY);
+const isLeap = y => (7 * y + 1) % 19 < 7;
+function elapsedDays(year) {
+  const p = year - 1;
+  const months = 235 * Math.floor(p / 19) + 12 * (p % 19) + Math.floor(((p % 19) * 7 + 1) / 19);
+  const pe = 204 + 793 * (months % 1080);
+  const he = 5 + 12 * months + 793 * Math.floor(months / 1080) + Math.floor(pe / 1080);
+  const parts = (pe % 1080) + 1080 * (he % 24);
+  let day = 1 + 29 * months + Math.floor(he / 24);
+  if (parts >= 19440 || (day % 7 === 2 && parts >= 9924 && !isLeap(year)) || (day % 7 === 1 && parts >= 16789 && isLeap(p))) day++;
+  if (day % 7 === 0 || day % 7 === 3 || day % 7 === 5) day++;
+  return day;
+}
+// Anchor: Rosh Hashana 5787 = 12 Sep 2026
+const RH_OFFSET = dn(2026, 9, 12) - elapsedDays(5787);
+const roshHashana = y => elapsedDays(y) + RH_OFFSET;
+// Offsets from Rosh Hashana of the current Hebrew year (a) and back from the next one (b).
+// Nisan 1 → next Tishrei 1 is always 177 days.
+const CHAG_A = {0: 'ראש השנה (יום א׳)', 1: 'ראש השנה (יום ב׳)', 9: 'יום כיפור', 14: 'סוכות', 21: 'שמיני עצרת / שמחת תורה'};
+const CHAG_B = {163: 'פסח', 157: 'שביעי של פסח', 113: 'שבועות'};
+const EREV_A = {8: 'ערב יום כיפור', 13: 'ערב סוכות', 20: 'הושענא רבה (ערב שמיני עצרת)'};
+const EREV_B = {1: 'ערב ראש השנה', 164: 'ערב פסח', 158: 'ערב שביעי של פסח', 114: 'ערב שבועות'};
+function classify(n) {
+  const g = dnDate(n);
+  let y = g.getUTCFullYear() + 3761;
+  if (roshHashana(y) > n) y--;
+  const a = n - roshHashana(y), b = roshHashana(y + 1) - n;
+  const wd = g.getUTCDay();
+  const cats = [], notes = [];
+  if (wd === 5) { cats.push('fri'); }
+  if (wd === 6) { cats.push('sat'); }
+  const erev = EREV_A[a] || EREV_B[b];
+  const chag = CHAG_A[a] || CHAG_B[b];
+  if (erev) { cats.push('erev'); notes.push(erev); }
+  if (chag) { cats.push('chag'); notes.push(chag); }
+  return {n, wd, cats, notes};
+}
+// ---------- CAL-END ----------
+
+const CATS = {fri: 'ערב שבת', sat: 'שבת', erev: 'ערב חג', chag: 'חג'};
+const CAT_ORDER = ['fri', 'sat', 'erev', 'chag'];
+const WD = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+const fmt = n => { const d = dnDate(n); return String(d.getUTCDate()).padStart(2, '0') + '/' + String(d.getUTCMonth() + 1).padStart(2, '0') + '/' + d.getUTCFullYear(); };
+let hebFmt = null;
+try { hebFmt = new Intl.DateTimeFormat('he-u-ca-hebrew', {day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC'}); } catch (e) {}
+const hebDate = n => { try { return hebFmt ? hebFmt.format(dnDate(n)) : ''; } catch (e) { return ''; } };
+
+// ---------- State ----------
+let periods = [];
+let isExample = true;
+let nextId = 1;
+const filter = new Set();
+function addPeriod(from, to, extra = {}) {
+  if (to < from) [from, to] = [to, from];
+  if (periods.some(p => p.from === from && p.to === to)) return;
+  periods.push({id: nextId++, from, to, on: true, ...extra});
+}
+// Example periods (shown until a real file is loaded)
+addPeriod(dn(2023, 10, 7), dn(2023, 12, 21), {src: 'דוגמה'});
+addPeriod(dn(2024, 4, 18), dn(2024, 5, 2), {src: 'דוגמה'});
+addPeriod(dn(2024, 9, 29), dn(2024, 10, 26), {src: 'דוגמה'});
+
+// ---------- PDF parsing ----------
+const DATE_RE = /(\d{1,4})\s*[./\-]\s*(\d{1,2})\s*[./\-]\s*(\d{1,4})/g;
+function tryDate(a, b, c) {
+  let y, m, d;
+  if (a.length === 4) { y = +a; m = +b; d = +c; }
+  else if (c.length === 4) { d = +a; m = +b; y = +c; }
+  else if (c.length === 2) { d = +a; m = +b; y = 2000 + +c; }
+  else return null;
+  if (y < 1990 || y > 2100 || m < 1 || m > 12 || d < 1 || d > 31) return null;
+  const n = dn(y, m, d), g = dnDate(n);
+  return g.getUTCDate() === d && g.getUTCMonth() + 1 === m ? n : null;
+}
+function findDates(text) {
+  const out = [];
+  for (const mt of text.matchAll(DATE_RE)) {
+    let n = tryDate(mt[1], mt[2], mt[3]);
+    if (n === null) { // RTL extraction sometimes reverses digit order
+      const r = [...mt[0].replace(/\s/g, '')].reverse().join('').split(/[./\-]/);
+      if (r.length === 3) n = tryDate(r[0], r[1], r[2]);
+    }
+    if (n !== null) out.push({n, i: mt.index, len: mt[0].length});
+  }
+  return out;
+}
+// ---------- Digit OCR (for forms saved as an image inside the PDF) ----------
+// Reads only digits and date punctuation; everything else becomes "?". Enough to find dd/mm/yyyy.
+const GW = 10, GH = 16;
+function glyphFeatures(ink, W, x0, x1, y0, y1) {
+  const w = x1 - x0 + 1, h = y1 - y0 + 1, f = new Float32Array(GW * GH), cnt = new Float32Array(GW * GH);
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    const c = Math.min(GH - 1, Math.floor((y - y0) * GH / h)) * GW + Math.min(GW - 1, Math.floor((x - x0) * GW / w));
+    cnt[c]++; f[c] += ink[y * W + x];
+  }
+  for (let i = 0; i < f.length; i++) f[i] = cnt[i] ? f[i] / cnt[i] : 0;
+  return {f, aspect: w / h};
+}
+let TEMPLATES = null;
+function buildTemplates() {
+  const out = [], S = 120, cv = document.createElement('canvas'); cv.width = cv.height = S;
+  const ctx = cv.getContext('2d', {willReadFrequently: true});
+  for (const weight of ['400', '700']) for (const ch of '0123456789/') {
+    ctx.clearRect(0, 0, S, S); ctx.fillStyle = '#000';
+    ctx.font = `${weight} 72px Arial, "Liberation Sans", Helvetica, sans-serif`;
+    ctx.fillText(ch, 20, 90);
+    const a = ctx.getImageData(0, 0, S, S).data, ink = new Uint8Array(S * S);
+    let x0 = S, x1 = -1, y0 = S, y1 = -1;
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) if (a[(y * S + x) * 4 + 3] > 110) {
+      ink[y * S + x] = 1; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+    }
+    out.push({ch, ...glyphFeatures(ink, S, x0, x1, y0, y1)});
+  }
+  return out;
+}
+function classifyGlyph(g) {
+  let best = null, bd = Infinity;
+  for (const t of TEMPLATES) {
+    let d = 0;
+    for (let i = 0; i < t.f.length; i++) d += (g.f[i] - t.f[i]) ** 2;
+    d = d / t.f.length + 0.15 * Math.log(g.aspect / t.aspect) ** 2;
+    if (d < bd) { bd = d; best = t.ch; }
+  }
+  return bd < 0.13 ? best : '?';
+}
+function ocrBitmap(ink, W, H) {
+  // Erase long horizontal strokes (underlines, table rules, filled bars) so they don't glue glyphs together.
+  const maxRun = Math.max(60, W * 0.06);
+  for (let y = 0; y < H; y++) {
+    let s = -1;
+    for (let x = 0; x <= W; x++) {
+      const on = x < W && ink[y * W + x];
+      if (on && s < 0) s = x;
+      if (!on && s >= 0) { if (x - s > maxRun) ink.fill(0, y * W + s, y * W + x); s = -1; }
+    }
+  }
+  const lines = [];
+  let y = 0;
+  while (y < H) {
+    while (y < H && !rowHas(y)) y++;
+    const top = y;
+    while (y < H && rowHas(y)) y++;
+    if (y > top) { const t = readBand(top, y - 1); if (t) lines.push(t); }
+  }
+  return lines;
+  function rowHas(yy) { for (let x = 0, o = yy * W; x < W; x++) if (ink[o + x]) return true; return false; }
+  function readBand(b0, b1) {
+    if (b1 - b0 < 6 || b1 - b0 > H * 0.08) return '';
+    const segs = [];
+    let s = -1;
+    for (let x = 0; x <= W; x++) {
+      let on = false;
+      if (x < W) for (let yy = b0; yy <= b1; yy++) if (ink[yy * W + x]) { on = true; break; }
+      if (on && s < 0) s = x;
+      if (!on && s >= 0) { segs.push(trim(s, x - 1)); s = -1; }
+    }
+    if (!segs.length) return '';
+    const hs = segs.map(g => g.y1 - g.y0 + 1).sort((a, b) => a - b);
+    const cap = hs[Math.floor(hs.length * 0.75)];
+    const bottoms = segs.filter(g => g.y1 - g.y0 + 1 > cap * 0.7).map(g => g.y1).sort((a, b) => a - b);
+    const base = bottoms.length ? bottoms[Math.floor(bottoms.length / 2)] : b1;
+    // Split glyphs that touch (wider than any single digit)
+    const glyphs = [];
+    for (const g of segs) splitWide(g, glyphs);
+    let out = '', prev = null;
+    for (const g of glyphs) {
+      const w = g.x1 - g.x0 + 1, h = g.y1 - g.y0 + 1;
+      if (prev && g.x0 - prev.x1 > cap * 0.55) out += ' ';
+      let ch;
+      if (h < cap * 0.3 && w < cap * 0.35 && Math.abs(g.y1 - base) < cap * 0.15) ch = '.';
+      else if (h < cap * 0.25 && w > h * 1.5) ch = '-';
+      else if (h < cap * 0.6) ch = '?';
+      else ch = classifyGlyph(glyphFeatures(ink, W, g.x0, g.x1, g.y0, g.y1));
+      out += ch; prev = g;
+    }
+    return out;
+    function trim(x0, x1) {
+      let y0 = b1, y1 = b0;
+      for (let yy = b0; yy <= b1; yy++) for (let x = x0; x <= x1; x++) if (ink[yy * W + x]) { if (yy < y0) y0 = yy; if (yy > y1) y1 = yy; break; }
+      return {x0, x1, y0, y1};
+    }
+    function splitWide(g, acc) {
+      const w = g.x1 - g.x0 + 1, h = g.y1 - g.y0 + 1;
+      if (w <= h * 0.85 || w < 6) { acc.push(g); return; }
+      let bx = -1, bv = Infinity;
+      for (let x = g.x0 + Math.floor(w * 0.3); x <= g.x0 + Math.floor(w * 0.7); x++) {
+        let v = 0; for (let yy = g.y0; yy <= g.y1; yy++) v += ink[yy * W + x];
+        if (v < bv) { bv = v; bx = x; }
+      }
+      if (bx < 0 || bv > h * 0.35) { acc.push(g); return; }
+      splitWide(trim(g.x0, bx - 1), acc); splitWide(trim(bx + 1, g.x1), acc);
+    }
+  }
+}
+async function ocrPage(page) {
+  if (!TEMPLATES) TEMPLATES = buildTemplates();
+  const v1 = page.getViewport({scale: 1});
+  const vp = page.getViewport({scale: Math.min(4, 2400 / v1.width)});
+  const cv = document.createElement('canvas'); cv.width = Math.ceil(vp.width); cv.height = Math.ceil(vp.height);
+  const ctx = cv.getContext('2d', {willReadFrequently: true});
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height);
+  await page.render({canvasContext: ctx, viewport: vp}).promise;
+  const {width: W, height: H, data} = ctx.getImageData(0, 0, cv.width, cv.height);
+  const ink = new Uint8Array(W * H);
+  for (let i = 0; i < W * H; i++) ink[i] = (0.299 * data[4 * i] + 0.587 * data[4 * i + 1] + 0.114 * data[4 * i + 2]) < 150 ? 1 : 0;
+  return ocrBitmap(ink, W, H);
+}
+
+async function pdfLines(file) {
+  const pdf = await pdfjsLib.getDocument({data: await file.arrayBuffer(), isEvalSupported: false}).promise;
+  const lines = [];
+  let ocr = false;
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const tc = await page.getTextContent();
+    if (!tc.items.some(it => /\d/.test(it.str || ''))) { lines.push(...await ocrPage(page)); ocr = true; continue; }
+    const items = tc.items.filter(it => it.str && it.str.trim()).map(it => ({s: it.str, x: it.transform[4], y: it.transform[5]}));
+    items.sort((a, b) => b.y - a.y || a.x - b.x);
+    const groups = [];
+    for (const it of items) {
+      const g = groups.find(g => Math.abs(g.y - it.y) <= 3);
+      if (g) g.items.push(it); else groups.push({y: it.y, items: [it]});
+    }
+    groups.sort((a, b) => b.y - a.y);
+    for (const g of groups) lines.push(g.items.sort((a, b) => a.x - b.x).map(i => i.s).join(' '));
+  }
+  return {lines, ocr};
+}
+function periodsFromLines(lines) {
+  const found = [];
+  for (const line of lines) {
+    const ds = findDates(line);
+    if (ds.length < 2) continue;
+    let rest = line;
+    for (const d of [...ds].reverse()) rest = rest.slice(0, d.i) + ' ' + rest.slice(d.i + d.len);
+    const ints = (rest.match(/\d{1,3}/g) || []).map(Number);
+    for (let k = 0; k + 1 < ds.length; k += 2) {
+      const from = Math.min(ds[k].n, ds[k + 1].n), to = Math.max(ds[k].n, ds[k + 1].n);
+      if (to - from > 400) continue;
+      found.push({from, to, verified: ints.includes(to - from + 1)});
+    }
+  }
+  let loose = false;
+  if (!found.length) { // dates split across lines: pair them in reading order
+    const all = lines.flatMap(l => findDates(l).map(d => d.n));
+    for (let k = 0; k + 1 < all.length; k += 2) {
+      const from = Math.min(all[k], all[k + 1]), to = Math.max(all[k], all[k + 1]);
+      if (to - from <= 400) found.push({from, to});
+    }
+    loose = found.length > 0;
+  }
+  // A range that contains other ranges is most likely the form's overall reporting period.
+  for (const p of found) {
+    const inside = found.filter(q => q !== p && q.from >= p.from && q.to <= p.to && !(q.from === p.from && q.to === p.to)).length;
+    if (inside >= 1) { p.on = false; p.note = 'נראה כטווח הכולל של הטופס, ולכן כבוי'; }
+  }
+  return {found, loose};
+}
+async function handleFiles(files) {
+  const st = document.getElementById('status');
+  const list = [...files].filter(f => /pdf$/i.test(f.type) || /\.pdf$/i.test(f.name));
+  if (!list.length) { st.className = 'status warn'; st.textContent = 'יש לבחור קובץ PDF.'; return; }
+  if (isExample) { periods = []; isExample = false; }
+  st.className = 'status'; st.textContent = 'קורא את הקובץ…';
+  const rawParts = [], msgs = [];
+  for (const f of list) {
+    try {
+      const {lines, ocr} = await pdfLines(f);
+      rawParts.push('=== ' + f.name + ' ===\n' + lines.join('\n'));
+      if (!lines.length) { msgs.push(f.name + ': לא נמצא טקסט בקובץ. הוסיפו את התקופות ידנית.'); continue; }
+      const {found, loose} = periodsFromLines(lines);
+      found.forEach(p => addPeriod(p.from, p.to, {src: f.name, verified: p.verified, note: p.note, on: p.on !== false}));
+      if (!found.length) msgs.push(f.name + ': לא זוהו תאריכי שירות. בדקו את הטקסט שחולץ והוסיפו ידנית.');
+      else msgs.push(f.name + ': זוהו ' + new Set(found.map(p => p.from + '-' + p.to)).size + ' טווחי תאריכים' + (ocr ? ' (נקראו מתמונת הטופס)' : '') + (loose ? ' (התאריכים לא הופיעו באותה שורה, כדאי לוודא)' : '') + '.');
+    } catch (e) {
+      msgs.push(f.name + ': לא ניתן לקרוא את הקובץ (' + (e && e.message || e) + ').');
+    }
+  }
+  st.className = msgs.some(m => /לא /.test(m)) ? 'status warn' : 'status';
+  st.textContent = msgs.join(' ') + ' בדקו את הרשימה וכבו תקופות שאינן שירות בפועל.';
+  document.getElementById('raw').textContent = rawParts.join('\n\n');
+  document.getElementById('rawBox').hidden = !rawParts.length;
+  render();
+}
+
+// ---------- Rendering ----------
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c])); }
+let lastRows = [];
+function render() {
+  periods.sort((a, b) => a.from - b.from);
+  const ul = document.getElementById('periods');
+  ul.innerHTML = periods.map(p => {
+    const days = p.to - p.from + 1;
+    const meta = [esc(p.src || 'ידני'), days + ' ימים'];
+    if (p.verified) meta.push('<span class="ok">✓ תואם למספר הימים בטופס</span>');
+    if (p.note) meta.push('<span class="note">' + esc(p.note) + '</span>');
+    return `<li class="period${p.on ? '' : ' off'}">
+      <input type="checkbox" id="p${p.id}" data-id="${p.id}" ${p.on ? 'checked' : ''} aria-label="כלול תקופה">
+      <label for="p${p.id}"><div class="range">${fmt(p.from)} – ${fmt(p.to)}</div><div class="meta">${meta.join(' · ')}</div></label>
+      <button class="x" type="button" data-del="${p.id}" aria-label="מחיקת תקופה">×</button></li>`;
+  }).join('') || '<li class="empty">אין תקופות. העלו קובץ או הוסיפו תקופה ידנית.</li>';
+
+  const daySet = new Set();
+  for (const p of periods) if (p.on) for (let n = p.from; n <= p.to; n++) daySet.add(n);
+  const days = [...daySet].sort((a, b) => a - b);
+  const rows = days.map(classify).filter(r => r.cats.length);
+  lastRows = rows;
+  const count = Object.fromEntries(CAT_ORDER.map(c => [c, rows.filter(r => r.cats.includes(c)).length]));
+  const sumCats = CAT_ORDER.reduce((s, c) => s + count[c], 0);
+  const overlap = rows.filter(r => r.cats.length > 1).length;
+
+  document.getElementById('tiles').innerHTML =
+    `<div class="tile hero"><span class="n">${rows.length}</span><span class="t">ימים ייחודיים בשבתות, בחגים ובערביהם</span><span class="s">כל תאריך נספר פעם אחת, גם אם הוא שייך לכמה קטגוריות</span></div>` +
+    CAT_ORDER.map(c => `<div class="tile ${c}"><span class="n">${count[c]}</span><span class="t">${CATS[c]}</span></div>`).join('');
+  document.getElementById('totals').innerHTML =
+    `<span>סה״כ ימי שירות: <b>${days.length}</b></span><span>סכום הקטגוריות: <b>${sumCats}</b></span><span>ימים בכמה קטגוריות: <b>${overlap}</b></span>`;
+
+  document.getElementById('chips').innerHTML =
+    `<button class="chip" type="button" data-f="" aria-pressed="${filter.size === 0}">הכול (${rows.length})</button>` +
+    CAT_ORDER.map(c => `<button class="chip" type="button" data-f="${c}" aria-pressed="${filter.has(c)}">${CATS[c]} (${count[c]})</button>`).join('');
+
+  const shown = filter.size ? rows.filter(r => r.cats.some(c => filter.has(c))) : rows;
+  document.getElementById('rows').innerHTML = shown.map(r =>
+    `<tr class="${r.cats.length > 1 ? 'overlap' : ''}"><td class="d">${fmt(r.n)}</td><td>${WD[r.wd]}</td><td class="heb">${esc(hebDate(r.n))}</td>
+     <td>${r.cats.map(c => `<span class="tag ${c}">${CATS[c]}</span>`).join('')}</td><td>${esc(r.notes.join(' · '))}</td></tr>`).join('')
+    || `<tr><td colspan="5" class="empty">אין ימים מתאימים בתקופות שנבחרו.</td></tr>`;
+}
+
+// ---------- Events ----------
+const drop = document.getElementById('drop');
+document.getElementById('file').addEventListener('change', e => { handleFiles(e.target.files); e.target.value = ''; });
+['dragenter', 'dragover'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => handleFiles(e.dataTransfer.files));
+document.getElementById('periods').addEventListener('change', e => {
+  const p = periods.find(p => p.id === +e.target.dataset.id); if (p) { p.on = e.target.checked; render(); }
+});
+document.getElementById('periods').addEventListener('click', e => {
+  const id = e.target.dataset && e.target.dataset.del; if (!id) return;
+  periods = periods.filter(p => p.id !== +id); render();
+});
+document.getElementById('addForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const f = document.getElementById('addFrom').value, t = document.getElementById('addTo').value;
+  if (!f || !t) return;
+  if (isExample) { periods = []; isExample = false; const st = document.getElementById('status'); st.className = 'status'; st.textContent = 'התקופות לדוגמה הוסרו.'; }
+  const p = s => { const [y, m, d] = s.split('-').map(Number); return dn(y, m, d); };
+  addPeriod(p(f), p(t), {src: 'ידני'});
+  e.target.reset(); render();
+});
+document.getElementById('chips').addEventListener('click', e => {
+  const b = e.target.closest('.chip'); if (!b) return;
+  const f = b.dataset.f;
+  if (!f) filter.clear(); else if (filter.has(f)) filter.delete(f); else filter.add(f);
+  render();
+});
+document.getElementById('copyBtn').addEventListener('click', async e => {
+  const btn = e.currentTarget;
+  const tsv = ['תאריך\tיום\tתאריך עברי\tערב שבת\tשבת\tערב חג\tחג\tפירוט',
+    ...lastRows.map(r => [fmt(r.n), WD[r.wd], hebDate(r.n), ...CAT_ORDER.map(c => r.cats.includes(c) ? 'V' : ''), r.notes.join(' · ')].join('\t'))].join('\n');
+  try { await navigator.clipboard.writeText(tsv); btn.textContent = 'הועתק. הדביקו באקסל'; }
+  catch (err) {
+    const raw = document.getElementById('raw'); raw.textContent = tsv; document.getElementById('rawBox').hidden = false; document.getElementById('rawBox').open = true;
+    const r = document.createRange(); r.selectNodeContents(raw); const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+    btn.textContent = 'הטקסט מסומן. העתיקו עם Ctrl+C';
+  }
+  setTimeout(() => btn.textContent = 'העתקת הטבלה לאקסל', 2500);
+});
+render();
+</script>
+</body>
+</html>
