@@ -291,26 +291,44 @@ function buildTemplates() {
     ctx.clearRect(0, 0, S, S); ctx.fillStyle = '#000';
     ctx.font = `${weight} 72px Arial, "Liberation Sans", Helvetica, sans-serif`;
     ctx.fillText(ch, 20, 90);
-    const a = ctx.getImageData(0, 0, S, S).data, ink = new Uint8Array(S * S);
+    const a = ctx.getImageData(0, 0, S, S).data, ink = new Float32Array(S * S);
     let x0 = S, x1 = -1, y0 = S, y1 = -1;
-    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) if (a[(y * S + x) * 4 + 3] > 110) {
-      ink[y * S + x] = 1; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const v = a[(y * S + x) * 4 + 3] / 255; ink[y * S + x] = v;
+      if (v > 0.43) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
     }
     out.push({ch, ...glyphFeatures(ink, S, x0, x1, y0, y1)});
   }
   return out;
 }
+// Returns the confident reading plus the closest digit and the slash distance, used for date decoding.
 function classifyGlyph(g) {
-  let best = null, bd = Infinity;
+  let best = null, bd = Infinity, digit = null, dd = Infinity, ds = Infinity;
   for (const t of TEMPLATES) {
     let d = 0;
     for (let i = 0; i < t.f.length; i++) d += (g.f[i] - t.f[i]) ** 2;
     d = d / t.f.length + 0.15 * Math.log(g.aspect / t.aspect) ** 2;
     if (d < bd) { bd = d; best = t.ch; }
+    if (t.ch === '/') ds = Math.min(ds, d);
+    else if (d < dd) { dd = d; digit = t.ch; }
   }
-  return bd < 0.13 ? best : '?';
+  return {ch: bd < 0.13 ? best : '?', digit, dd, ds};
 }
-function ocrBitmap(ink, W, H) {
+// A date is 10 glyphs shaped dd/mm/yyyy. Inside that shape, take the closest digit even when it is not a confident match.
+function decodeDates(items) {
+  for (let i = 0; i + 10 <= items.length; i++) {
+    const w = items.slice(i, i + 10);
+    if (w.slice(1).some(g => g.space)) continue;
+    const ok = w.every((g, k) => g.m && (k === 2 || k === 5 ? g.m.ds < 0.22 && g.m.ds <= g.m.dd : g.m.dd < 0.22));
+    if (!ok) continue;
+    const txt = w.map((g, k) => k === 2 || k === 5 ? '/' : g.m.digit).join('');
+    const [d, m, y] = txt.split('/');
+    if (tryDate(d, m, y) === null) continue;
+    w.forEach((g, k) => { g.ch = txt[k]; });
+    i += 9;
+  }
+}
+function ocrBitmap(ink, dark, W, H) {
   // Erase long horizontal strokes (underlines, table rules, filled bars) so they don't glue glyphs together.
   const maxRun = Math.max(60, W * 0.06);
   for (let y = 0; y < H; y++) {
@@ -318,7 +336,7 @@ function ocrBitmap(ink, W, H) {
     for (let x = 0; x <= W; x++) {
       const on = x < W && ink[y * W + x];
       if (on && s < 0) s = x;
-      if (!on && s >= 0) { if (x - s > maxRun) ink.fill(0, y * W + s, y * W + x); s = -1; }
+      if (!on && s >= 0) { if (x - s > maxRun) { ink.fill(0, y * W + s, y * W + x); dark.fill(0, y * W + s, y * W + x); } s = -1; }
     }
   }
   const lines = [];
@@ -349,18 +367,18 @@ function ocrBitmap(ink, W, H) {
     // Split glyphs that touch (wider than any single digit)
     const glyphs = [];
     for (const g of segs) splitWide(g, glyphs);
-    let out = '', prev = null;
+    const items = [];
+    let prev = null;
     for (const g of glyphs) {
       const w = g.x1 - g.x0 + 1, h = g.y1 - g.y0 + 1;
-      if (prev && g.x0 - prev.x1 > cap * 0.55) out += ' ';
-      let ch;
-      if (h < cap * 0.3 && w < cap * 0.35 && Math.abs(g.y1 - base) < cap * 0.15) ch = '.';
-      else if (h < cap * 0.25 && w > h * 1.5) ch = '-';
-      else if (h < cap * 0.6) ch = '?';
-      else ch = classifyGlyph(glyphFeatures(ink, W, g.x0, g.x1, g.y0, g.y1));
-      out += ch; prev = g;
+      const it = {space: !!prev && g.x0 - prev.x1 > cap * 0.55, ch: '?', m: null};
+      if (h < cap * 0.3 && w < cap * 0.35 && Math.abs(g.y1 - base) < cap * 0.15) it.ch = '.';
+      else if (h < cap * 0.25 && w > h * 1.5) it.ch = '-';
+      else if (h >= cap * 0.6) { it.m = classifyGlyph(glyphFeatures(dark, W, g.x0, g.x1, g.y0, g.y1)); it.ch = it.m.ch; }
+      items.push(it); prev = g;
     }
-    return out;
+    decodeDates(items);
+    return items.map(it => (it.space ? ' ' : '') + it.ch).join('');
     function trim(x0, x1) {
       let y0 = b1, y1 = b0;
       for (let yy = b0; yy <= b1; yy++) for (let x = x0; x <= x1; x++) if (ink[yy * W + x]) { if (yy < y0) y0 = yy; if (yy > y1) y1 = yy; break; }
@@ -388,9 +406,13 @@ async function ocrPage(page) {
   ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height);
   await page.render({canvasContext: ctx, viewport: vp}).promise;
   const {width: W, height: H, data} = ctx.getImageData(0, 0, cv.width, cv.height);
-  const ink = new Uint8Array(W * H);
-  for (let i = 0; i < W * H; i++) ink[i] = (0.299 * data[4 * i] + 0.587 * data[4 * i + 1] + 0.114 * data[4 * i + 2]) < 150 ? 1 : 0;
-  return ocrBitmap(ink, W, H);
+  const ink = new Uint8Array(W * H), dark = new Float32Array(W * H);
+  for (let i = 0; i < W * H; i++) {
+    const lum = 0.299 * data[4 * i] + 0.587 * data[4 * i + 1] + 0.114 * data[4 * i + 2];
+    ink[i] = lum < 150 ? 1 : 0;
+    dark[i] = Math.min(1, Math.max(0, (235 - lum) / 175)); // grey table stripes read as paper
+  }
+  return ocrBitmap(ink, dark, W, H);
 }
 
 async function pdfLines(file) {
