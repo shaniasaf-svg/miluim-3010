@@ -138,7 +138,7 @@ details pre{white-space:pre-wrap;max-height:260px;overflow:auto;background:var(-
         <small>אפשר כמה קבצים. הקובץ נקרא בדפדפן בלבד ולא נשלח לשום מקום.</small>
       </label>
       <input type="file" id="file" accept="application/pdf,.pdf" multiple hidden>
-      <div id="status" class="status example">מוצגות תקופות לדוגמה. העלו טופס 3010 כדי לחשב את הנתונים שלכם.</div>
+      <div id="status" class="status example">העלו טופס 3010 כדי להתחיל. התקופות שיזוהו יופיעו כאן.</div>
       <ul class="periods" id="periods"></ul>
       <form class="add" id="addForm">
         <label for="addFrom">מתאריך<input type="date" id="addFrom" required></label>
@@ -234,7 +234,6 @@ const hebDate = n => { try { return hebFmt ? hebFmt.format(dnDate(n)) : ''; } ca
 
 // ---------- State ----------
 let periods = [];
-let isExample = true;
 let nextId = 1;
 const filter = new Set();
 function addPeriod(from, to, extra = {}) {
@@ -242,10 +241,6 @@ function addPeriod(from, to, extra = {}) {
   if (periods.some(p => p.from === from && p.to === to)) return;
   periods.push({id: nextId++, from, to, on: true, ...extra});
 }
-// Example periods (shown until a real file is loaded)
-addPeriod(dn(2023, 10, 7), dn(2023, 12, 21), {src: 'דוגמה'});
-addPeriod(dn(2024, 4, 18), dn(2024, 5, 2), {src: 'דוגמה'});
-addPeriod(dn(2024, 9, 29), dn(2024, 10, 26), {src: 'דוגמה'});
 
 // ---------- PDF parsing ----------
 const DATE_RE = /(\d{1,4})\s*[./\-]\s*(\d{1,2})\s*[./\-]\s*(\d{1,4})/g;
@@ -469,7 +464,6 @@ async function handleFiles(files) {
   const st = document.getElementById('status');
   const list = [...files].filter(f => /pdf$/i.test(f.type) || /\.pdf$/i.test(f.name));
   if (!list.length) { st.className = 'status warn'; st.textContent = 'יש לבחור קובץ PDF.'; return; }
-  if (isExample) { periods = []; isExample = false; }
   st.className = 'status'; st.textContent = 'קורא את הקובץ…';
   const rawParts = [], msgs = [];
   for (const f of list) {
@@ -532,7 +526,7 @@ function render() {
   document.getElementById('rows').innerHTML = shown.map(r =>
     `<tr class="${r.cats.length > 1 ? 'overlap' : ''}"><td class="d">${fmt(r.n)}</td><td>${WD[r.wd]}</td><td class="heb">${esc(hebDate(r.n))}</td>
      <td>${r.cats.map(c => `<span class="tag ${c}">${CATS[c]}</span>`).join('')}</td><td>${esc(r.notes.join(' · '))}</td></tr>`).join('')
-    || `<tr><td colspan="5" class="empty">אין ימים מתאימים בתקופות שנבחרו.</td></tr>`;
+    || `<tr><td colspan="5" class="empty">${periods.some(p => p.on) ? 'אין ימים מתאימים בתקופות שנבחרו.' : 'הטבלה תתמלא אחרי העלאת טופס 3010.'}</td></tr>`;
 }
 
 // ---------- Events ----------
@@ -552,7 +546,6 @@ document.getElementById('addForm').addEventListener('submit', e => {
   e.preventDefault();
   const f = document.getElementById('addFrom').value, t = document.getElementById('addTo').value;
   if (!f || !t) return;
-  if (isExample) { periods = []; isExample = false; const st = document.getElementById('status'); st.className = 'status'; st.textContent = 'התקופות לדוגמה הוסרו.'; }
   const p = s => { const [y, m, d] = s.split('-').map(Number); return dn(y, m, d); };
   addPeriod(p(f), p(t), {src: 'ידני'});
   e.target.reset(); render();
